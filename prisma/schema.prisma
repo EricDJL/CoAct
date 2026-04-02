@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Stage - 课程基本信息
+model Stage {
+  id             String           @id @default(cuid())
+  name           String
+  description    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  language       String?
+  style          String?
+  currentSceneId String?
+  agentIds       String[]
+
+  scenes         Scene[]
+  chatSessions   ChatSession[]
+  generatedAgents GeneratedAgent[]
+  mediaFiles     MediaFile[]
+  audioFiles     AudioFile[]
+  imageFiles     ImageFile[]
+}
+
+// Scene - 场景数据
+model Scene {
+  id        String   @id @default(cuid())
+  stageId   String
+  type      String
+  title     String
+  content   Json
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stage     Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+}
+
+// ChatSession - 聊天会话
+model ChatSession {
+  id              String      @id @default(cuid())
+  stageId         String
+  type            String
+  title           String
+  status          String
+  messages        Json
+  config          Json?
+  toolCalls       Json?
+  pendingToolCalls Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  sceneId         String?
+  lastActionIndex Int?
+
+  stage           Stage       @relation(fields: [stageId], references: [id], onDelete: Cascade)
+}
+
+// GeneratedAgent - 生成的代理
+model GeneratedAgent {
+  id        String   @id @default(cuid())
+  stageId   String
+  name      String
+  avatar    String?
+  role      String
+  background String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stage     Stage    @relation(fields: [stageId], references: [id], onDelete: Cascade)
+}
+
+// MediaFile - 媒体文件
+model MediaFile {
+  id          String   @id @default(cuid())
+  stageId     String?
+  type        String
+  filename    String
+  url         String
+  ossKey      String?
+  mimeType    String
+  size        Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stage       Stage?   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+}
+
+// AudioFile - 音频文件
+model AudioFile {
+  id          String   @id @default(cuid())
+  stageId     String?
+  filename    String
+  url         String
+  ossKey      String?
+  mimeType    String
+  size        Int
+  duration    Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stage       Stage?   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+}
+
+// ImageFile - 图片文件
+model ImageFile {
+  id          String   @id @default(cuid())
+  stageId     String?
+  filename    String
+  url         String
+  ossKey      String?
+  mimeType    String
+  size        Int
+  width       Int?
+  height      Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stage       Stage?   @relation(fields: [stageId], references: [id], onDelete: Cascade)
+}
+
+// ClassroomJob - 课程生成任务
+model ClassroomJob {
+  id             String   @id @default(cuid())
+  status         String
+  step           String
+  progress       Int
+  message        String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  startedAt      DateTime?
+  completedAt    DateTime?
+  inputSummary   Json
+  scenesGenerated Int
+  totalScenes    Int?
+  result         Json?
+  error          String?
+}

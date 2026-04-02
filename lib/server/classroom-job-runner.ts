@@ -5,7 +5,7 @@ import {
   markClassroomGenerationJobRunning,
   markClassroomGenerationJobSucceeded,
   updateClassroomGenerationJobProgress,
-} from '@/lib/server/classroom-job-store';
+} from '@/lib/server/classroom-job-store-db';
 
 const log = createLogger('ClassroomJob');
 const runningJobs = new Map<string, Promise<void>>();

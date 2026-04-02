@@ -20,12 +20,12 @@ import { parseModelString } from '@/lib/ai/providers';
 import { resolveApiKey, resolveWebSearchApiKey } from '@/lib/server/provider-config';
 import { resolveModel } from '@/lib/server/resolve-model';
 import { searchWithTavily, formatSearchResultsAsContext } from '@/lib/web-search/tavily';
-import { persistClassroom } from '@/lib/server/classroom-storage';
+import { persistClassroom } from '@/lib/server/classroom-storage-db';
 import {
   generateMediaForClassroom,
   replaceMediaPlaceholders,
   generateTTSForClassroom,
-} from '@/lib/server/classroom-media-generation';
+} from '@/lib/server/classroom-media-generation-oss';
 import type { UserRequirements } from '@/lib/types/generation';
 import type { Scene, Stage } from '@/lib/types/stage';
 
@@ -362,43 +362,6 @@ export async function generateClassroom(
     throw new Error('No scenes were generated');
   }
 
-  // Phase: Media generation (after all scenes generated)
-  if (input.enableImageGeneration || input.enableVideoGeneration) {
-    await options.onProgress?.({
-      step: 'generating_media',
-      progress: 90,
-      message: 'Generating media files',
-      scenesGenerated: scenes.length,
-      totalScenes: outlines.length,
-    });
-
-    try {
-      const mediaMap = await generateMediaForClassroom(outlines, stageId, options.baseUrl);
-      replaceMediaPlaceholders(scenes, mediaMap);
-      log.info(`Media generation complete: ${Object.keys(mediaMap).length} files`);
-    } catch (err) {
-      log.warn('Media generation phase failed, continuing:', err);
-    }
-  }
-
-  // Phase: TTS generation
-  if (input.enableTTS) {
-    await options.onProgress?.({
-      step: 'generating_tts',
-      progress: 94,
-      message: 'Generating TTS audio',
-      scenesGenerated: scenes.length,
-      totalScenes: outlines.length,
-    });
-
-    try {
-      await generateTTSForClassroom(scenes, stageId, options.baseUrl);
-      log.info('TTS generation complete');
-    } catch (err) {
-      log.warn('TTS generation phase failed, continuing:', err);
-    }
-  }
-
   await options.onProgress?.({
     step: 'persisting',
     progress: 98,
@@ -417,6 +380,43 @@ export async function generateClassroom(
   );
 
   log.info(`Classroom persisted: ${persisted.id}, URL: ${persisted.url}`);
+
+  // Phase: Media generation (after classroom persisted)
+  if (input.enableImageGeneration || input.enableVideoGeneration) {
+    await options.onProgress?.({
+      step: 'generating_media',
+      progress: 90,
+      message: 'Generating media files',
+      scenesGenerated: scenes.length,
+      totalScenes: outlines.length,
+    });
+
+    try {
+      const mediaMap = await generateMediaForClassroom(outlines, stageId);
+      replaceMediaPlaceholders(scenes, mediaMap);
+      log.info(`Media generation complete: ${Object.keys(mediaMap).length} files`);
+    } catch (err) {
+      log.warn('Media generation phase failed, continuing:', err);
+    }
+  }
+
+  // Phase: TTS generation
+  if (input.enableTTS) {
+    await options.onProgress?.({
+      step: 'generating_tts',
+      progress: 94,
+      message: 'Generating TTS audio',
+      scenesGenerated: scenes.length,
+      totalScenes: outlines.length,
+    });
+
+    try {
+      await generateTTSForClassroom(scenes, stageId);
+      log.info('TTS generation complete');
+    } catch (err) {
+      log.warn('TTS generation phase failed, continuing:', err);
+    }
+  }
 
   await options.onProgress?.({
     step: 'completed',

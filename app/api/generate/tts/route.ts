@@ -14,6 +14,8 @@ import type { TTSProviderId } from '@/lib/audio/types';
 import { createLogger } from '@/lib/logger';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { validateUrlForSSRF } from '@/lib/server/ssrf-guard';
+import { ossService } from '@/lib/server/oss-service';
+import prisma from '@/lib/server/db';
 
 const log = createLogger('TTS API');
 
@@ -22,7 +24,7 @@ export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { text, audioId, ttsProviderId, ttsModelId, ttsVoice, ttsSpeed, ttsApiKey, ttsBaseUrl } =
+    const { text, audioId, ttsProviderId, ttsModelId, ttsVoice, ttsSpeed, ttsApiKey, ttsBaseUrl, stageId } =
       body as {
         text: string;
         audioId: string;
@@ -32,6 +34,7 @@ export async function POST(req: NextRequest) {
         ttsSpeed?: number;
         ttsApiKey?: string;
         ttsBaseUrl?: string;
+        stageId?: string;
       };
 
     // Validate required fields
@@ -78,12 +81,43 @@ export async function POST(req: NextRequest) {
     );
 
     // Generate audio
-    const { audio, format } = await generateTTS(config, text);
+    const { audio, format, duration } = await generateTTS(config, text);
+
+    let url: string | undefined;
+    let ossKey: string | undefined;
+
+    // Upload to OSS and save to database if stageId is provided
+    if (stageId) {
+      try {
+        const filename = `${stageId}/audio/${audioId}.${format}`;
+        const audioBuffer = Buffer.from(audio);
+        const result = await ossService.uploadFile(audioBuffer, filename, `audio/${format}`);
+        url = result.url;
+        ossKey = result.ossKey;
+
+        // Save to database
+        await prisma.audioFile.create({
+          data: {
+            stageId,
+            filename: `${audioId}.${format}`,
+            url,
+            ossKey,
+            mimeType: `audio/${format}`,
+            size: audio.length,
+            duration,
+          },
+        });
+
+        log.info(`Generated TTS uploaded to OSS: ${filename} (${audio.length} bytes)`);
+      } catch (ossError) {
+        log.warn('Failed to upload TTS to OSS, returning base64 only:', ossError);
+      }
+    }
 
     // Convert to base64
     const base64 = Buffer.from(audio).toString('base64');
 
-    return apiSuccess({ audioId, base64, format });
+    return apiSuccess({ audioId, base64, format, url });
   } catch (error) {
     log.error('TTS generation error:', error);
     return apiError(

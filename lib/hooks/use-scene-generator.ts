@@ -125,6 +125,7 @@ export async function generateAndStoreTTS(
   audioId: string,
   text: string,
   signal?: AbortSignal,
+  stageId?: string,
 ): Promise<void> {
   const settings = useSettingsStore.getState();
   if (settings.ttsProviderId === 'browser-native-tts') return;
@@ -142,6 +143,7 @@ export async function generateAndStoreTTS(
       ttsSpeed: settings.ttsSpeed,
       ttsApiKey: ttsProviderConfig?.apiKey || undefined,
       ttsBaseUrl: ttsProviderConfig?.baseUrl || undefined,
+      stageId,
     }),
     signal,
   });
@@ -175,6 +177,7 @@ export async function generateAndStoreTTS(
 async function generateTTSForScene(
   scene: Scene,
   signal?: AbortSignal,
+  stageId?: string,
 ): Promise<{ success: boolean; failedCount: number; error?: string }> {
   const providerId = useSettingsStore.getState().ttsProviderId;
   scene.actions = splitLongSpeechActions(scene.actions || [], providerId);
@@ -190,7 +193,7 @@ async function generateTTSForScene(
     const audioId = `tts_${action.id}`;
     action.audioId = audioId;
     try {
-      await generateAndStoreTTS(audioId, action.text, signal);
+      await generateAndStoreTTS(audioId, action.text, signal, stageId);
     } catch (error) {
       failedCount++;
       lastError = error instanceof Error ? error.message : `TTS failed for action ${action.id}`;
@@ -364,7 +367,7 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
 
             // TTS generation — failure means the whole scene fails
             if (settings.ttsEnabled && settings.ttsProviderId !== 'browser-native-tts') {
-              const ttsResult = await generateTTSForScene(scene, signal);
+              const ttsResult = await generateTTSForScene(scene, signal, stage.id);
               if (!ttsResult.success) {
                 if (abortRef.current || store.getState().generationEpoch !== startEpoch) {
                   pausedByFailureOrAbort = true;
@@ -509,7 +512,7 @@ export function useSceneGenerator(options: UseSceneGeneratorOptions = {}) {
         // Step 3: TTS
         const settings = useSettingsStore.getState();
         if (settings.ttsEnabled && settings.ttsProviderId !== 'browser-native-tts') {
-          const ttsResult = await generateTTSForScene(actionsResult.scene, signal);
+          const ttsResult = await generateTTSForScene(actionsResult.scene, signal, state.stage.id);
           if (!ttsResult.success) {
             store.getState().addFailedOutline(outline);
             return;

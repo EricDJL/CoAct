@@ -570,9 +570,9 @@ export const useSettingsStore = create<SettingsState>()(
         // Video settings (use defaults)
         ...defaultVideoConfig,
 
-        // Media generation toggles (off by default)
-        imageGenerationEnabled: false,
-        videoGenerationEnabled: false,
+        // Media generation toggles (on by default)
+        imageGenerationEnabled: true,
+        videoGenerationEnabled: false, // Keep video off by default for performance
 
         // Audio feature toggles (on by default)
         ttsEnabled: true,

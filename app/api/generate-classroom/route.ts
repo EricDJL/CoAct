@@ -3,8 +3,8 @@ import { nanoid } from 'nanoid';
 import { apiError, apiSuccess } from '@/lib/server/api-response';
 import { type GenerateClassroomInput } from '@/lib/server/classroom-generation';
 import { runClassroomGenerationJob } from '@/lib/server/classroom-job-runner';
-import { createClassroomGenerationJob } from '@/lib/server/classroom-job-store';
-import { buildRequestOrigin } from '@/lib/server/classroom-storage';
+import { createClassroomGenerationJob } from '@/lib/server/classroom-job-store-db';
+import { buildRequestOrigin } from '@/lib/server/classroom-storage-db';
 
 export const maxDuration = 30;
 
@@ -16,13 +16,9 @@ export async function POST(req: NextRequest) {
       ...(rawBody.pdfContent ? { pdfContent: rawBody.pdfContent } : {}),
       ...(rawBody.language ? { language: rawBody.language } : {}),
       ...(rawBody.enableWebSearch != null ? { enableWebSearch: rawBody.enableWebSearch } : {}),
-      ...(rawBody.enableImageGeneration != null
-        ? { enableImageGeneration: rawBody.enableImageGeneration }
-        : {}),
-      ...(rawBody.enableVideoGeneration != null
-        ? { enableVideoGeneration: rawBody.enableVideoGeneration }
-        : {}),
-      ...(rawBody.enableTTS != null ? { enableTTS: rawBody.enableTTS } : {}),
+      enableImageGeneration: rawBody.enableImageGeneration ?? true,
+      enableVideoGeneration: rawBody.enableVideoGeneration ?? false,
+      enableTTS: rawBody.enableTTS ?? true,
       ...(rawBody.agentMode ? { agentMode: rawBody.agentMode } : {}),
     };
     const { requirement } = body;

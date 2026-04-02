@@ -3,8 +3,8 @@ import { apiError, apiSuccess } from '@/lib/server/api-response';
 import {
   isValidClassroomJobId,
   readClassroomGenerationJob,
-} from '@/lib/server/classroom-job-store';
-import { buildRequestOrigin } from '@/lib/server/classroom-storage';
+} from '@/lib/server/classroom-job-store-db';
+import { buildRequestOrigin } from '@/lib/server/classroom-storage-db';
 
 export const dynamic = 'force-dynamic';
 

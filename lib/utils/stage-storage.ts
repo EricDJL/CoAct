@@ -10,6 +10,7 @@ import { ChatSession } from '../types/chat';
 import { db } from './database';
 import { saveChatSessions, loadChatSessions, deleteChatSessions } from './chat-storage';
 import { clearPlaybackState } from './playback-storage';
+import { clientApiService } from '@/lib/client/api-service';
 import { createLogger } from '@/lib/logger';
 
 const log = createLogger('StageStorage');
@@ -31,13 +32,13 @@ export interface StageListItem {
 }
 
 /**
- * Save stage data to IndexedDB
+ * Save stage data to IndexedDB and server database
  */
 export async function saveStageData(stageId: string, data: StageStoreData): Promise<void> {
   try {
     const now = Date.now();
 
-    // Save to stages table
+    // Save to IndexedDB
     await db.stages.put({
       id: stageId,
       name: data.stage.name || 'Untitled Stage',
@@ -71,7 +72,21 @@ export async function saveStageData(stageId: string, data: StageStoreData): Prom
       await saveChatSessions(stageId, data.chats);
     }
 
-    log.info(`Saved stage: ${stageId}`);
+    log.info(`Saved stage to IndexedDB: ${stageId}`);
+
+    // Also save to server database
+    try {
+      const { clientApiService } = await import('@/lib/client/api-service');
+      const success = await clientApiService.saveStageToAPI(stageId, data);
+      if (success) {
+        log.info(`Saved stage to server database: ${stageId}`);
+      } else {
+        log.warn(`Failed to save stage to server database: ${stageId}`);
+      }
+    } catch (apiError) {
+      log.error('Failed to save stage to server API:', apiError);
+      // Don't throw - IndexedDB save succeeded
+    }
   } catch (error) {
     log.error('Failed to save stage:', error);
     throw error;
@@ -79,24 +94,43 @@ export async function saveStageData(stageId: string, data: StageStoreData): Prom
 }
 
 /**
- * Load stage data from IndexedDB
+ * Load stage data from API (database) first, fallback to IndexedDB
  */
 export async function loadStageData(stageId: string): Promise<StageStoreData | null> {
   try {
-    // Load stage
+    // First try to load from API (database)
+    log.info(`Attempting to load stage from API: ${stageId}`);
+    const apiData = await clientApiService.loadStageFromAPI(stageId);
+    
+    if (apiData) {
+      log.info(`Loaded stage from API: ${stageId}, scenes: ${apiData.scenes.length}`);
+      
+      // Load chats from IndexedDB (chats are still stored locally)
+      const chats = await loadChatSessions(stageId);
+      
+      return {
+        ...apiData,
+        chats,
+      };
+    }
+    
+    // Fallback to IndexedDB if API fails
+    log.info(`API load failed, falling back to IndexedDB for stage: ${stageId}`);
+    
+    // Load stage from IndexedDB
     const stage = await db.stages.get(stageId);
     if (!stage) {
       log.info(`Stage not found: ${stageId}`);
       return null;
     }
 
-    // Load scenes
+    // Load scenes from IndexedDB
     const scenes = await db.scenes.where('stageId').equals(stageId).sortBy('order');
 
-    // Load chat sessions from independent table
+    // Load chat sessions from IndexedDB
     const chats = await loadChatSessions(stageId);
 
-    log.info(`Loaded stage: ${stageId}, scenes: ${scenes.length}, chats: ${chats.length}`);
+    log.info(`Loaded stage from IndexedDB: ${stageId}, scenes: ${scenes.length}, chats: ${chats.length}`);
 
     return {
       stage,

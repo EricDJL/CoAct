@@ -6,7 +6,7 @@ import {
   isValidClassroomId,
   persistClassroom,
   readClassroom,
-} from '@/lib/server/classroom-storage';
+} from '@/lib/server/classroom-storage-db';
 
 export async function POST(request: NextRequest) {
   try {
